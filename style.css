@@ -1,0 +1,407 @@
+/* Reset e base */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+ 
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #0f172a;
+    color: #f1f5f9;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+ 
+/* Cabeçalho */
+header {
+    width: 100%;
+    background-color: #1e293b;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    border-bottom: 2px solid #22c55e;
+}
+ 
+header img {
+    height: 150px;
+}
+ 
+/* Conteúdo principal */
+main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 20px;
+    max-width: 660px;
+    width: 100%;
+    gap: 24px;
+}
+ 
+h1 {
+    font-size: 2rem;
+    text-align: center;
+    color: #f1f5f9;
+}
+ 
+p {
+    font-size: 1.1rem;
+    text-align: center;
+    color: #94a3b8;
+    line-height: 1.6;
+}
+ 
+/* Etapas */
+#etapa-upload,
+#etapa-validacao,
+#etapa-revisao {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+ 
+/* Área de upload */
+.upload-area {
+    width: 100%;
+    border: 2px dashed #22c55e;
+    border-radius: 16px;
+    padding: 50px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    position: relative;
+}
+ 
+.upload-area:hover {
+    background-color: #1a2e1a;
+}
+ 
+.upload-area span {
+    font-size: 1.1rem;
+    color: #22c55e;
+}
+ 
+.upload-area input {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+ 
+/* Prévia das fotos */
+.previa-fotos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    width: 100%;
+}
+ 
+.previa-fotos img {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid #22c55e;
+}
+ 
+/* Campo de contexto */
+.campo-contexto {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+ 
+.campo-contexto label {
+    font-size: 0.95rem;
+    color: #94a3b8;
+}
+ 
+.campo-contexto label span {
+    font-size: 0.85rem;
+    color: #64748b;
+}
+ 
+.campo-contexto textarea {
+    width: 100%;
+    height: 100px;
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 14px;
+    color: #f1f5f9;
+    font-size: 0.95rem;
+    font-family: 'Segoe UI', sans-serif;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.3s;
+}
+ 
+.campo-contexto textarea:focus {
+    border-color: #22c55e;
+}
+ 
+/* Botão principal */
+.btn-gerar {
+    width: 100%;
+    padding: 18px;
+    background-color: #22c55e;
+    color: #0f172a;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+ 
+.btn-gerar:hover {
+    background-color: #16a34a;
+}
+ 
+/* Mensagem de erro */
+.mensagem-erro {
+    width: 100%;
+    text-align: center;
+    color: #f87171;
+    font-size: 0.95rem;
+    min-height: 24px;
+}
+ 
+/* ─── ETAPA 2: Validação ─── */
+.validacao-header {
+    text-align: center;
+}
+ 
+.validacao-header h2 {
+    font-size: 1.5rem;
+    color: #22c55e;
+    margin-bottom: 8px;
+}
+ 
+.validacao-sub {
+    font-size: 0.95rem;
+    color: #94a3b8;
+    text-align: center;
+}
+ 
+/* Card de validação por foto */
+.card-validacao {
+    width: 100%;
+    background-color: #1e293b;
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    border: 1px solid #334155;
+}
+ 
+.card-validacao img {
+    width: 110px;
+    height: 110px;
+    object-fit: cover;
+    border-radius: 10px;
+    flex-shrink: 0;
+    border: 2px solid #22c55e;
+}
+ 
+.card-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+ 
+.card-info label {
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+ 
+.card-info strong {
+    font-size: 1rem;
+    color: #22c55e;
+}
+ 
+.card-input {
+    width: 100%;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: #f1f5f9;
+    font-size: 0.95rem;
+    font-family: 'Segoe UI', sans-serif;
+    outline: none;
+    transition: border-color 0.3s;
+}
+ 
+.card-input:focus {
+    border-color: #22c55e;
+}
+ 
+.card-acoes {
+    display: flex;
+    gap: 8px;
+}
+ 
+.btn-confirmar-foto {
+    padding: 7px 14px;
+    background-color: #22c55e;
+    color: #0f172a;
+    font-size: 0.85rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+ 
+.btn-confirmar-foto:hover {
+    background-color: #16a34a;
+}
+ 
+.btn-editar-foto {
+    padding: 7px 14px;
+    background-color: transparent;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+ 
+.btn-editar-foto:hover {
+    border-color: #22c55e;
+    color: #22c55e;
+}
+ 
+.card-confirmado {
+    border-color: #22c55e;
+    opacity: 0.7;
+}
+ 
+.tag-confirmado {
+    font-size: 0.8rem;
+    color: #22c55e;
+    font-weight: bold;
+}
+ 
+/* Botão confirmar todos */
+.btn-confirmar {
+    width: 100%;
+    padding: 18px;
+    background-color: #22c55e;
+    color: #0f172a;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+ 
+.btn-confirmar:hover {
+    background-color: #16a34a;
+}
+ 
+/* ─── ETAPA 3: Revisão ─── */
+.area-revisao {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+ 
+.area-revisao h2 {
+    font-size: 1.3rem;
+    color: #22c55e;
+    text-align: center;
+}
+ 
+.laudo-texto {
+    width: 100%;
+    background-color: #1e293b;
+    border-radius: 16px;
+    padding: 30px;
+    line-height: 1.8;
+    font-size: 0.95rem;
+    color: #f1f5f9;
+    white-space: pre-wrap;
+}
+ 
+.chat-revisao {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+ 
+.chat-revisao label {
+    font-size: 0.95rem;
+    color: #94a3b8;
+}
+ 
+.chat-revisao textarea {
+    width: 100%;
+    height: 80px;
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 14px;
+    color: #f1f5f9;
+    font-size: 0.95rem;
+    font-family: 'Segoe UI', sans-serif;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.3s;
+}
+ 
+.chat-revisao textarea:focus {
+    border-color: #22c55e;
+}
+ 
+.btn-alteracao {
+    width: 100%;
+    padding: 14px;
+    background-color: #1e293b;
+    color: #22c55e;
+    font-size: 1rem;
+    font-weight: bold;
+    border: 2px solid #22c55e;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+ 
+.btn-alteracao:hover {
+    background-color: #22c55e;
+    color: #0f172a;
+}
+ 
+.btn-pdf {
+    width: 100%;
+    padding: 18px;
+    background-color: #2563eb;
+    color: #ffffff;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+ 
+.btn-pdf:hover {
+    background-color: #1d4ed8;
+}
+ 

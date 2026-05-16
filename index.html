@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VistorIA</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+ 
+    <header>
+        <img src="logo completa 2.png" alt="VistorIA">
+    </header>
+ 
+    <main>
+        <h1>Laudo de vistoria em minutos</h1>
+        <p>Envie as fotos do imóvel e a IA gera o laudo técnico completo para você.</p>
+ 
+        <!-- ETAPA 1: Upload -->
+        <div id="etapa-upload">
+            <div class="upload-area">
+                <span>📷 Clique para selecionar as fotos</span>
+                <input type="file" id="input-fotos" multiple accept="image/*">
+            </div>
+ 
+            <div class="previa-fotos" id="previa-fotos"></div>
+ 
+            <div class="campo-contexto">
+                <label for="contexto">Informações adicionais <span>(opcional)</span></label>
+                <textarea id="contexto" placeholder="Ex: banheiro reformado há 6 meses, imóvel para locação, proprietário relatou infiltração na parede direita..."></textarea>
+            </div>
+ 
+            <button class="btn-gerar" id="btn-gerar">Gerar Laudo</button>
+            <div class="mensagem-erro" id="mensagem-erro"></div>
+        </div>
+ 
+        <!-- ETAPA 2: Validação dos cômodos -->
+        <div id="etapa-validacao" style="display:none;">
+            <div class="validacao-header">
+                <h2>🏠 Validação dos Cômodos</h2>
+                <p class="validacao-sub">A IA identificou os cômodos abaixo. Confirme ou corrija cada um antes de gerar o laudo.</p>
+            </div>
+ 
+            <div id="cards-validacao"></div>
+ 
+            <button class="btn-confirmar" id="btn-confirmar">✅ Confirmar e Gerar Laudo</button>
+        </div>
+ 
+        <!-- ETAPA 3: Revisão do laudo -->
+        <div id="etapa-revisao" style="display:none;">
+            <div class="area-revisao" id="area-revisao">
+                <h2>Rascunho do Laudo</h2>
+                <div class="laudo-texto" id="laudo-texto"></div>
+ 
+                <div class="chat-revisao">
+                    <label for="pedido-alteracao">Quer alterar algum ponto?</label>
+                    <textarea id="pedido-alteracao" placeholder="Ex: mude o nível de urgência do banheiro para alto, adicione que a janela estava com folga..."></textarea>
+                    <button class="btn-alteracao" id="btn-alteracao">✏️ Solicitar Alteração</button>
+                </div>
+ 
+                <button class="btn-pdf" id="btn-pdf">📄 Gerar PDF Final</button>
+            </div>
+        </div>
+ 
+    </main>
+ 
+    <script src="app.js"></script>
+</body>
+</html>
+ 
