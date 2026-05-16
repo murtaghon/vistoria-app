@@ -9,343 +9,429 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable,
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from dotenv import load_dotenv
+from PIL import Image as PILImage
 import os, io, json, tempfile
- 
+
 load_dotenv()
- 
+
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
- 
+
 client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
- 
-# ─── Prompt de identificação de cômodos ─────────────────
+
 PROMPT_IDENTIFICAR = """
 Você é um assistente de vistoria de imóveis.
- 
+
 Analise cada foto enviada e identifique qual cômodo ou área do imóvel ela representa.
- 
+
 Responda APENAS com um JSON válido, sem texto adicional, sem markdown, sem explicações.
 O JSON deve ter exatamente este formato:
 {"comodos": ["Nome do Cômodo 1", "Nome do Cômodo 2", "Nome do Cômodo 3"]}
- 
+
 Exemplos de nomes: "Sala de Estar", "Quarto Principal", "Banheiro Social", "Cozinha", "Área de Serviço", "Varanda", "Corredor"
- 
+
 Se não conseguir identificar, use "Área não identificada".
 A lista deve ter exatamente o mesmo número de itens que o número de fotos enviadas.
 """
- 
-# ─── Prompt de geração do laudo ─────────────────────────
+
 PROMPT_LAUDO = """
-Você é um assistente de vistoria de imóveis. Analise as fotos com cautela e descreva apenas o que é claramente visível.
- 
-Regras obrigatórias:
-- Nunca invente ou suponha materiais, marcas ou detalhes que não estejam claramente visíveis
-- Se não tiver certeza sobre um material, use: "aparenta ser", "não identificado com clareza" ou "requer verificação presencial"
-- Diferencie com cuidado materiais parecidos: azulejo x papel de parede, porcelanato x cerâmica, inox x cromado
-- Ralos embutidos no piso devem ser descritos como "ralo embutido" — nunca assuma o material se não estiver visível
-- Descreva o que vê, não o que é comum existir naquele tipo de ambiente
- 
-As fotos estão organizadas por cômodo conforme indicado.
-Para cada cômodo, gere uma seção com:
- 
-NOME DO CÔMODO EM MAIÚSCULAS
-- O que está em bom estado
-- O que apresenta problemas ou merece atenção
-- O que requer verificação presencial
-- Nível de urgência: nenhuma / baixa / média / alta
- 
-Ao final, escreva:
-CONCLUSÃO GERAL
-Classificação: 🟢 APROVADO, 🟡 APROVADO COM RESSALVAS ou 🔴 REPROVADO
+Você é um perito técnico de vistoria de imóveis com experiência em engenharia civil e avaliação patrimonial.
+
+Gere um laudo técnico de vistoria completo, detalhado e profissional com base nas fotos fornecidas.
+
+REGRAS OBRIGATÓRIAS:
+- Descreva apenas o que é claramente visível nas imagens
+- Nunca invente materiais, marcas ou condições não visíveis
+- Use terminologia técnica da construção civil
+- Quando houver dúvida sobre um material, use: "aparenta ser", "requer verificação presencial" ou "não identificado com clareza nas imagens"
+- Diferencie com precisão: azulejo x porcelanato x cerâmica x revestimento vinílico x papel de parede
+- Diferencie: inox x cromado x escovado x pintado
+- Use APENAS texto simples. NUNCA use asteriscos, hashtags ou qualquer marcação markdown.
+
+ESTRUTURA OBRIGATÓRIA — siga exatamente este formato para cada cômodo:
+
+NOME DO COMODO EM MAIUSCULAS
+
+REVESTIMENTOS:
+- Piso: descreva material, padrão, estado de conservação, anomalias visíveis
+- Paredes: descreva revestimento, pintura, estado, anomalias
+- Teto: descreva acabamento, pintura, estado, anomalias
+
+ESQUADRIAS E VEDACOES:
+- Portas: material, estado, ferragens
+- Janelas: material, estado, vedação aparente
+- Box/Divisórias: se houver
+
+INSTALACOES APARENTES:
+- Elétrica: tomadas, interruptores, pontos de luz visíveis
+- Hidráulica: torneiras, ralos, sifões, registros visíveis
+- Louças e metais: estado de conservação
+
+ANOMALIAS IDENTIFICADAS:
+- Descrição técnica, localização, possível causa e urgência: BAIXO / MEDIO / ALTO / CRITICO
+
+ITENS QUE REQUEREM VERIFICACAO PRESENCIAL:
+- Liste tudo que não foi possível avaliar pelas imagens
+
+CLASSIFICACAO DO AMBIENTE: BOM ESTADO / REGULAR / RUIM
+
+Após todos os cômodos, inclua:
+
+CONCLUSAO GERAL DA VISTORIA
+
+RESUMO EXECUTIVO:
+Parágrafo técnico resumindo o estado geral.
+
+PRINCIPAIS ANOMALIAS:
+- Liste as anomalias mais relevantes
+
+RECOMENDACOES TECNICAS:
+- Liste ações recomendadas em ordem de prioridade
+
+CLASSIFICACAO GERAL: APROVADO / APROVADO COM RESSALVAS / REPROVADO
 """
- 
-# ─── Rota 1: Identificar cômodos ────────────────────────
+
 @app.route('/identificar-comodos', methods=['POST'])
 def identificar_comodos():
- 
     if 'fotos' not in request.files:
         return jsonify({'erro': 'Nenhuma foto recebida'}), 400
- 
+
     fotos = request.files.getlist('fotos')
     conteudo = [PROMPT_IDENTIFICAR]
- 
+
     for foto in fotos:
         dados = foto.read()
         imagem = types.Part.from_bytes(data=dados, mime_type=foto.content_type)
         conteudo.append(imagem)
- 
-    resposta = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=conteudo
-    )
- 
-    texto = resposta.text.strip()
-    # Remove possível markdown
-    texto = texto.replace('```json', '').replace('```', '').strip()
- 
+
+    resposta = client.models.generate_content(model='gemini-2.5-flash', contents=conteudo)
+    texto = resposta.text.strip().replace('```json', '').replace('```', '').strip()
+
     try:
-        resultado = json.loads(texto)
-        return jsonify(resultado)
+        return jsonify(json.loads(texto))
     except:
-        # Se falhar o parse, retorna genérico
-        comodos = [f'Ambiente {i+1}' for i in range(len(fotos))]
-        return jsonify({'comodos': comodos})
- 
-# ─── Rota 2: Gerar laudo ────────────────────────────────
+        return jsonify({'comodos': [f'Ambiente {i+1}' for i in range(len(fotos))]})
+
+
 @app.route('/gerar-laudo', methods=['POST'])
 def gerar_laudo():
- 
     if 'fotos' not in request.files:
         return jsonify({'erro': 'Nenhuma foto recebida'}), 400
- 
-    fotos   = request.files.getlist('fotos')
-    comodos = json.loads(request.form.get('comodos', '[]'))
+
+    fotos    = request.files.getlist('fotos')
+    comodos  = json.loads(request.form.get('comodos', '[]'))
     contexto = request.form.get('contexto', '')
- 
+
     prompt_final = PROMPT_LAUDO
     if contexto:
         prompt_final += f"\n\nInformações adicionais: {contexto}"
- 
-    # Monta conteúdo agrupando foto com nome do cômodo
+
     conteudo = [prompt_final]
     for i, foto in enumerate(fotos):
         nome = comodos[i] if i < len(comodos) else f'Ambiente {i+1}'
-        conteudo.append(f'\n--- {nome} ---')
+        conteudo.append(f'\nCOMODO: {nome.upper()}\n')
         dados = foto.read()
-        imagem = types.Part.from_bytes(data=dados, mime_type=foto.content_type)
-        conteudo.append(imagem)
- 
-    resposta = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=conteudo
-    )
- 
+        conteudo.append(types.Part.from_bytes(data=dados, mime_type=foto.content_type))
+
+    resposta = client.models.generate_content(model='gemini-2.5-flash', contents=conteudo)
     return jsonify({'laudo': resposta.text})
- 
-# ─── Rota 3: Revisar laudo ──────────────────────────────
+
+
 @app.route('/revisar-laudo', methods=['POST'])
 def revisar_laudo():
- 
     dados       = request.get_json()
     laudo_atual = dados.get('laudo_atual', '')
     pedido      = dados.get('pedido', '')
- 
+
     if not laudo_atual or not pedido:
         return jsonify({'erro': 'Dados incompletos'}), 400
- 
-    prompt_revisao = f"""
-Você é um assistente de vistoria de imóveis.
- 
-Abaixo está um laudo técnico já gerado. O usuário quer fazer uma alteração específica.
-Aplique APENAS a alteração solicitada, mantendo todo o restante exatamente igual.
- 
+
+    prompt = f"""Você é um perito de vistoria de imóveis.
+Aplique APENAS a alteração solicitada no laudo abaixo, mantendo o restante exatamente igual.
+Use apenas texto simples sem markdown.
+
 LAUDO ATUAL:
 {laudo_atual}
- 
+
 ALTERAÇÃO SOLICITADA:
 {pedido}
- 
-Retorne o laudo completo e atualizado.
-"""
- 
-    resposta = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=[prompt_revisao]
-    )
- 
+
+Retorne o laudo completo e atualizado."""
+
+    resposta = client.models.generate_content(model='gemini-2.5-flash', contents=[prompt])
     return jsonify({'laudo': resposta.text})
- 
-# ─── Rota 4: Gerar PDF com fotos ────────────────────────
+
+
 @app.route('/gerar-pdf', methods=['POST'])
 def gerar_pdf():
- 
     laudo   = request.form.get('laudo', '')
     comodos = json.loads(request.form.get('comodos', '[]'))
     fotos   = request.files.getlist('fotos')
- 
+
     if not laudo:
         return jsonify({'erro': 'Laudo vazio'}), 400
- 
-    # Salva fotos temporariamente
+
+    # Salva fotos corrigindo orientação EXIF
     fotos_temp = []
     for foto in fotos:
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
-        foto.save(tmp.name)
+        try:
+            img = PILImage.open(foto)
+            exif = img._getexif()
+            if exif:
+                orientacao = exif.get(274)
+                rotacoes = {3: 180, 6: 270, 8: 90}
+                if orientacao in rotacoes:
+                    img = img.rotate(rotacoes[orientacao], expand=True)
+            img.save(tmp.name, 'JPEG')
+        except:
+            foto.seek(0)
+            foto.save(tmp.name)
         fotos_temp.append(tmp.name)
- 
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-                            rightMargin=2*cm, leftMargin=2*cm,
-                            topMargin=2*cm, bottomMargin=2*cm)
- 
-    # ── Estilos ──────────────────────────────────────────
-    AZUL     = colors.HexColor("#1A2C4E")
-    VERDE    = colors.HexColor("#16a34a")
-    CINZA    = colors.HexColor("#374151")
-    VERDE_CL = colors.HexColor("#22c55e")
- 
-    def estilo(name, **kw):
-        base = dict(fontName='Helvetica', fontSize=11,
-                    textColor=CINZA, leading=18)
-        base.update(kw)
-        return ParagraphStyle(name, **base)
- 
-    e_titulo   = estilo('titulo',   fontSize=16, fontName='Helvetica-Bold',
-                        textColor=VERDE, alignment=TA_CENTER, spaceAfter=8)
-    e_secao    = estilo('secao',    fontSize=13, fontName='Helvetica-Bold',
-                        textColor=AZUL, spaceBefore=14, spaceAfter=6)
-    e_item     = estilo('item',     leftIndent=15, spaceAfter=4)
-    e_corpo    = estilo('corpo',    alignment=TA_JUSTIFY, spaceAfter=6)
-    e_conclusao= estilo('conclusao',fontSize=12, fontName='Helvetica-Bold',
-                        textColor=VERDE, spaceBefore=12, spaceAfter=6)
-    e_rodape   = estilo('rodape',   fontSize=8,  textColor=colors.HexColor("#94a3b8"),
-                        alignment=TA_CENTER)
- 
-    story = []
- 
-    # ── Logo ─────────────────────────────────────────────
-    logo_path = os.path.join(os.path.dirname(__file__), 'logo completa 2.png')
-    try:
-        logo = RLImage(logo_path, width=7*cm, height=3.5*cm)
-        story.append(logo)
-    except:
-        pass
- 
-    story.append(Spacer(1, 0.3*cm))
-    story.append(Paragraph("LAUDO DE VISTORIA", e_titulo))
-    story.append(HRFlowable(width="100%", thickness=1.5,
-                 color=VERDE_CL, spaceAfter=16))
- 
-    # ── Agrupa fotos por cômodo ───────────────────────────
+
+    # Agrupa fotos por cômodo
     grupos = {}
     for i, caminho in enumerate(fotos_temp):
         nome = comodos[i] if i < len(comodos) else f'Ambiente {i+1}'
         grupos.setdefault(nome, []).append(caminho)
- 
-    # ── Divide o laudo por seções ─────────────────────────
-    secoes_laudo = {}
-    secao_atual  = None
-    linhas_secao = []
- 
+
+    # Parser do laudo — divide em seções
+    comodos_upper = [c.upper() for c in comodos]
+    secoes_laudo  = {}
+    secao_atual   = None
+    linhas_secao  = []
+
+    SECOES_CONTEUDO = [
+        'REVESTIMENTOS:', 'ESQUADRIAS E VEDACOES:', 'INSTALACOES APARENTES:',
+        'ANOMALIAS IDENTIFICADAS:', 'ITENS QUE REQUEREM VERIFICACAO PRESENCIAL:',
+        'CLASSIFICACAO DO AMBIENTE:',
+        'RESUMO EXECUTIVO:', 'PRINCIPAIS ANOMALIAS:', 'RECOMENDACOES TECNICAS:',
+        'CLASSIFICACAO GERAL:'
+    ]
+
+    MARCADORES_CONCLUSAO = [
+        'CONCLUSAO GERAL', 'CONCLUSÃO GERAL', 'CONCLUSAO FINAL',
+        'CONCLUSÃO FINAL', 'CONSIDERACOES FINAIS', 'CONSIDERAÇÕES FINAIS'
+    ]
+
     for linha in laudo.split('\n'):
-        linha_limpa = linha.strip()
-        linha_limpa = linha_limpa.replace('**', '').replace('*', '').replace('##', '').replace('#', '')
- 
-        if linha_limpa == '':
-            if secao_atual and linhas_secao:
+        l = linha.strip().replace('**','').replace('*','').replace('##','').replace('#','')
+
+        if not l:
+            if secao_atual is not None and linhas_secao:
                 secoes_laudo.setdefault(secao_atual, []).extend(linhas_secao)
                 linhas_secao = []
+                # Adiciona linha em branco para preservar formatação
+                secoes_laudo.setdefault(secao_atual, []).append('')
             continue
- 
-        # Detecta cabeçalho de seção (tudo maiúsculo ou termina com :)
-        eh_secao = (linha_limpa.isupper() and len(linha_limpa) > 3) or \
-                   (linha_limpa.startswith('---') and linha_limpa.endswith('---'))
- 
-        if eh_secao:
-            if secao_atual and linhas_secao:
+
+        l_upper = l.upper()
+
+        eh_conclusao = any(m in l_upper for m in MARCADORES_CONCLUSAO)
+        # Evita falso positivo: linhas com '-' nunca são cabeçalho
+        eh_comodo = (
+            not l.startswith('-') and
+            not l.startswith('•') and
+            any(c in l_upper or l_upper in c for c in comodos_upper)
+        )
+        eh_secao_conteudo = any(l_upper.startswith(s) for s in SECOES_CONTEUDO)
+        eh_titulo = (
+            l.isupper() and len(l) > 3 and
+            not l.startswith('-') and not l.startswith('•') and
+            not eh_secao_conteudo
+        )
+
+        # Depois da conclusão, não quebra mais em seções
+        em_conclusao = secao_atual == 'CONCLUSAO GERAL'
+
+        if not em_conclusao and (eh_conclusao or eh_comodo or eh_titulo):
+            if secao_atual is not None and linhas_secao:
                 secoes_laudo.setdefault(secao_atual, []).extend(linhas_secao)
                 linhas_secao = []
-            secao_atual = linha_limpa.strip('-').strip()
+            secao_atual = 'CONCLUSAO GERAL' if eh_conclusao else l
         else:
-            linhas_secao.append(linha_limpa)
- 
-    if secao_atual and linhas_secao:
+            if secao_atual is not None:
+                linhas_secao.append(l)
+
+    if secao_atual is not None and linhas_secao:
         secoes_laudo.setdefault(secao_atual, []).extend(linhas_secao)
- 
-    # ── Monta o PDF por cômodo ────────────────────────────
+
+    # DEBUG
+    print("\n=== DEBUG PDF ===")
+    print("CÔMODOS:", comodos)
+    print("SEÇÕES:", list(secoes_laudo.keys()))
+    print("=================\n")
+    for chave in secoes_laudo.keys():
+        if 'CONCLUS' in chave.upper():
+            print("CONCLUSAO ENCONTRADA:", chave)
+            break
+    else:
+        print("CONCLUSAO NAO ENCONTRADA — chaves disponíveis:", list(secoes_laudo.keys()))
+
+
+
+    # Monta o PDF
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=2*cm, leftMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+
+    AZUL  = colors.HexColor("#1A2C4E")
+    AZUL2 = colors.HexColor("#2563EB")
+    VERDE = colors.HexColor("#16a34a")
+    VCLR  = colors.HexColor("#22c55e")
+    CINZA = colors.HexColor("#374151")
+    CINZL = colors.HexColor("#64748b")
+    BRNCO = colors.white
+    VERM  = colors.HexColor("#dc2626")
+    AMRLO = colors.HexColor("#d97706")
+
+    def E(name, **kw):
+        b = dict(fontName='Helvetica', fontSize=10, textColor=CINZA, leading=16)
+        b.update(kw)
+        return ParagraphStyle(name, **b)
+
+    eH1  = E('H1', fontSize=18, fontName='Helvetica-Bold', textColor=AZUL,  alignment=TA_CENTER, spaceAfter=4)
+    eCOM = E('COM', fontSize=13, fontName='Helvetica-Bold', textColor=BRNCO, alignment=TA_LEFT)
+    eSEC = E('SEC', fontSize=10, fontName='Helvetica-Bold', textColor=AZUL2, spaceAfter=4, spaceBefore=10)
+    eITM = E('ITM', leftIndent=15, spaceAfter=3)
+    eCRP = E('CRP', alignment=TA_JUSTIFY, spaceAfter=6)
+    eALT = E('ALT', leftIndent=15, spaceAfter=3, textColor=VERM)
+    eMED = E('MED', leftIndent=15, spaceAfter=3, textColor=AMRLO)
+    eCON = E('CON', fontSize=11, fontName='Helvetica-Bold', textColor=VERDE, spaceAfter=6, spaceBefore=8)
+    eRDP = E('RDP', fontSize=8, textColor=CINZL, alignment=TA_CENTER)
+
+    def cabecalho_bloco(texto):
+        t = Table([[Paragraph(texto, eCOM)]], colWidths=[17*cm])
+        t.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0),(-1,-1), AZUL),
+            ('TOPPADDING',    (0,0),(-1,-1), 10),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 10),
+            ('LEFTPADDING',   (0,0),(-1,-1), 14),
+            ('RIGHTPADDING',  (0,0),(-1,-1), 14),
+        ]))
+        return t
+
+    def renderizar_linhas(linhas):
+        for l in linhas:
+            if not l.strip():
+                story.append(Spacer(1, 0.1*cm))
+            elif any(l.upper().startswith(s) for s in [
+                'REVESTIMENTO', 'ESQUADRIA', 'INSTALAC', 'ANOMALIA',
+                'ITENS QUE', 'CLASSIFICAC', 'RESUMO', 'PRINCIPAL', 'RECOMENDAC'
+            ]):
+                story.append(Paragraph(l, eSEC))
+                story.append(HRFlowable(width="100%", thickness=0.3,
+                             color=colors.HexColor("#e2e8f0"), spaceAfter=4))
+            elif 'ALTO' in l.upper() or 'CRITICO' in l.upper():
+                story.append(Paragraph('⚠ ' + l.lstrip('-•').strip(), eALT))
+            elif 'MEDIO' in l.upper() or 'MÉDIO' in l.upper():
+                story.append(Paragraph('⚡ ' + l.lstrip('-•').strip(), eMED))
+            elif l.startswith('-') or l.startswith('•'):
+                story.append(Paragraph('• ' + l.lstrip('-•').strip(), eITM))
+            elif 'APROVADO' in l.upper() or 'REPROVADO' in l.upper():
+                story.append(Paragraph(l, eCON))
+            elif l.isupper() and len(l) > 3:
+                story.append(Paragraph(l, eSEC))
+            else:
+                story.append(Paragraph(l, eCRP))
+
+    story = []
+
+    # Logo
+    logo_path = os.path.join(os.path.dirname(__file__), 'logo completa 2.png')
+    try:
+        story.append(RLImage(logo_path, width=7*cm, height=3.5*cm))
+    except:
+        pass
+
+    story.append(Spacer(1, 0.3*cm))
+    story.append(Paragraph("LAUDO DE VISTORIA", eH1))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=VCLR, spaceAfter=16))
+
     comodos_vistos = set()
- 
+
     for nome_comodo, caminhos in grupos.items():
         if nome_comodo in comodos_vistos:
             continue
         comodos_vistos.add(nome_comodo)
- 
-        # Título do cômodo
-        story.append(Paragraph(nome_comodo.upper(), e_secao))
-        story.append(HRFlowable(width="100%", thickness=0.5,
-                     color=colors.HexColor("#e2e8f0"), spaceAfter=10))
- 
-        # Fotos do cômodo em grid
-        imagens_row = []
-        for caminho in caminhos:
+
+        story.append(cabecalho_bloco(nome_comodo.upper()))
+        story.append(Spacer(1, 0.3*cm))
+
+        # Fotos em grid
+        imgs = []
+        for c in caminhos:
             try:
-                img = RLImage(caminho, width=7.5*cm, height=5.5*cm)
-                img.hAlign = 'CENTER'
-                imagens_row.append(img)
+                imgs.append(RLImage(c, width=7.5*cm, height=5.5*cm))
             except:
                 pass
- 
-        if imagens_row:
-            # Máximo 2 fotos por linha
-            for i in range(0, len(imagens_row), 2):
-                par = imagens_row[i:i+2]
-                if len(par) == 1:
-                    par.append(Spacer(7.5*cm, 5.5*cm))
-                t = Table([par], colWidths=[8.25*cm, 8.25*cm])
-                t.setStyle(TableStyle([
-                    ('ALIGN',   (0,0), (-1,-1), 'CENTER'),
-                    ('VALIGN',  (0,0), (-1,-1), 'MIDDLE'),
-                    ('LEFTPADDING',  (0,0), (-1,-1), 4),
-                    ('RIGHTPADDING', (0,0), (-1,-1), 4),
-                    ('BOTTOMPADDING',(0,0), (-1,-1), 8),
-                ]))
-                story.append(t)
- 
+
+        for i in range(0, len(imgs), 2):
+            par = imgs[i:i+2]
+            if len(par) == 1:
+                par.append(Spacer(7.5*cm, 5.5*cm))
+            t = Table([par], colWidths=[8.25*cm, 8.25*cm])
+            t.setStyle(TableStyle([
+                ('ALIGN',        (0,0),(-1,-1), 'CENTER'),
+                ('VALIGN',       (0,0),(-1,-1), 'MIDDLE'),
+                ('LEFTPADDING',  (0,0),(-1,-1), 4),
+                ('RIGHTPADDING', (0,0),(-1,-1), 4),
+                ('BOTTOMPADDING',(0,0),(-1,-1), 8),
+            ]))
+            story.append(t)
+
         story.append(Spacer(1, 0.3*cm))
- 
-        # Texto da análise — busca seção correspondente
-        texto_encontrado = False
+
+        # Texto da análise
+        encontrou = False
         for chave, linhas in secoes_laudo.items():
-            if nome_comodo.upper() in chave.upper() or chave.upper() in nome_comodo.upper():
-                for l in linhas:
-                    if l.startswith('CONCLUSÃO') or l.startswith('🟢') or \
-                       l.startswith('🟡') or l.startswith('🔴'):
-                        story.append(Paragraph(l, e_conclusao))
-                    elif l.startswith('-') or l.startswith('•'):
-                        story.append(Paragraph('• ' + l.lstrip('-•').strip(), e_item))
-                    elif l.endswith(':') or (l.isupper() and len(l) > 3):
-                        story.append(Paragraph(l, e_secao))
-                    else:
-                        story.append(Paragraph(l, e_corpo))
-                texto_encontrado = True
+            if (nome_comodo.upper() in chave.upper() or
+                chave.upper() in nome_comodo.upper()):
+                renderizar_linhas(linhas)
+                encontrou = True
                 break
- 
-        if not texto_encontrado:
-            story.append(Paragraph('Análise não encontrada para este cômodo.', e_corpo))
- 
-        story.append(Spacer(1, 0.5*cm))
- 
-    # ── Conclusão geral ───────────────────────────────────
-    story.append(HRFlowable(width="100%", thickness=1,
-                 color=VERDE_CL, spaceAfter=12))
- 
+
+        if not encontrou:
+            story.append(Paragraph('Análise não localizada para este cômodo.', eCRP))
+
+        story.append(Spacer(1, 0.6*cm))
+
+    # Conclusão
+    story.append(HRFlowable(width="100%", thickness=1.5, color=VCLR, spaceAfter=12))
+    story.append(cabecalho_bloco('CONCLUSÃO GERAL DA VISTORIA'))
+    story.append(Spacer(1, 0.4*cm))
+
     for chave, linhas in secoes_laudo.items():
-        if 'CONCLUS' in chave.upper():
-            story.append(Paragraph('CONCLUSÃO GERAL', e_secao))
+        if 'CONCLUS' in chave.upper() or 'CONSIDERAC' in chave.upper():
+            print("RENDERIZANDO CONCLUSAO — linhas:", len(linhas))
             for l in linhas:
-                story.append(Paragraph(l, e_conclusao))
- 
-    # ── Rodapé ───────────────────────────────────────────
+                print("  LINHA:", repr(l[:80]))
+            renderizar_linhas(linhas)
+            break
+    else:
+        print("CONCLUSAO NAO RENDERIZADA")
+
+    # Rodapé
     story.append(Spacer(1, 1*cm))
     story.append(HRFlowable(width="100%", thickness=0.5,
                  color=colors.HexColor("#94a3b8"), spaceAfter=6))
-    story.append(Paragraph("VistorIA — Laudos inteligentes para o mercado imobiliário — 2026",
-                 e_rodape))
- 
+    story.append(Paragraph(
+        "VistorIA — Laudos inteligentes para o mercado imobiliário — 2026", eRDP))
+
     doc.build(story)
- 
-    # Limpa arquivos temporários
-    for caminho in fotos_temp:
+
+    for c in fotos_temp:
         try:
-            os.unlink(caminho)
+            os.unlink(c)
         except:
             pass
- 
+
     buffer.seek(0)
     return send_file(buffer, mimetype='application/pdf',
                      as_attachment=True,
                      download_name='laudo_vistoria.pdf')
- 
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
- 
