@@ -405,3 +405,183 @@ p {
     background-color: #1d4ed8;
 }
  
+/* Auth box */
+.auth-box {
+    width: 100%;
+    max-width: 420px;
+    background-color: #1e293b;
+    border-radius: 20px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.auth-abas {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.aba {
+    flex: 1;
+    padding: 10px;
+    background-color: transparent;
+    color: #64748b;
+    font-size: 0.95rem;
+    font-weight: bold;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.aba.ativa {
+    background-color: #22c55e;
+    color: #0f172a;
+    border-color: #22c55e;
+}
+
+.auth-box h2 {
+    font-size: 1.3rem;
+    color: #f1f5f9;
+    text-align: center;
+}
+
+.auth-input {
+    width: 100%;
+    padding: 14px;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    color: #f1f5f9;
+    font-size: 0.95rem;
+    font-family: 'Segoe UI', sans-serif;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.auth-input:focus {
+    border-color: #22c55e;
+}
+
+#form-login,
+#form-cadastro {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Header com usuário */
+header {
+    justify-content: space-between;
+    padding: 20px 40px;
+}
+
+.header-usuario {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header-usuario span {
+    font-size: 0.95rem;
+    color: #94a3b8;
+}
+
+.btn-logout {
+    padding: 8px 16px;
+    background-color: transparent;
+    color: #f87171;
+    font-size: 0.85rem;
+    font-weight: bold;
+    border: 1px solid #f87171;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-logout:hover {
+    background-color: #f87171;
+    color: #0f172a;
+}
+
+/* Histórico */
+.historico-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.historico-header h1 {
+    font-size: 1.5rem;
+    color: #f1f5f9;
+    text-align: left;
+}
+
+.btn-novo {
+    padding: 10px 20px;
+    background-color: #22c55e;
+    color: #0f172a;
+    font-size: 0.95rem;
+    font-weight: bold;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background-color 0.3s;
+}
+
+.btn-novo:hover {
+    background-color: #16a34a;
+}
+
+.card-laudo {
+    width: 100%;
+    background-color: #1e293b;
+    border-radius: 14px;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid #334155;
+}
+
+.card-laudo-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.card-laudo-info strong {
+    font-size: 1rem;
+    color: #f1f5f9;
+}
+
+.card-laudo-info span {
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.btn-ver {
+    padding: 8px 18px;
+    background-color: transparent;
+    color: #22c55e;
+    font-size: 0.9rem;
+    font-weight: bold;
+    border: 1px solid #22c55e;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.btn-ver:hover {
+    background-color: #22c55e;
+    color: #0f172a;
+}
+
+.sem-laudos {
+    text-align: center;
+    color: #64748b;
+    font-size: 1rem;
+    padding: 40px 0;
+}

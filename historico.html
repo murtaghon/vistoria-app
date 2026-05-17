@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VistorIA — Histórico</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <img src="logo completa 2.png" alt="VistorIA">
+        <div class="header-usuario">
+            <span id="nome-usuario"></span>
+            <button class="btn-logout" id="btn-logout">Sair</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="historico-header">
+            <h1>Meus Laudos</h1>
+            <a href="index.html" class="btn-novo">+ Novo Laudo</a>
+        </div>
+
+        <div id="lista-laudos"></div>
+    </main>
+
+    <script>
+        const token = localStorage.getItem('token')
+        const nome  = localStorage.getItem('nome')
+
+        if (!token) {
+            window.location.href = 'login.html'
+        }
+
+        document.getElementById('nome-usuario').textContent = 'Olá, ' + nome
+        document.getElementById('btn-logout').addEventListener('click', function() {
+            localStorage.removeItem('token')
+            localStorage.removeItem('nome')
+            window.location.href = 'login.html'
+        })
+
+        // Carrega o histórico
+        fetch('http://127.0.0.1:5000/historico', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(r => r.json())
+        .then(function(dados) {
+            const lista = document.getElementById('lista-laudos')
+
+            if (!dados.laudos || dados.laudos.length === 0) {
+                lista.innerHTML = '<p class="sem-laudos">Nenhum laudo gerado ainda.</p>'
+                return
+            }
+
+            dados.laudos.forEach(function(laudo) {
+                const card = document.createElement('div')
+                card.classList.add('card-laudo')
+                card.innerHTML = `
+                    <div class="card-laudo-info">
+                        <strong>${laudo.endereco}</strong>
+                        <span>${new Date(laudo.criado_em).toLocaleDateString('pt-BR', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit'
+                        })}</span>
+                    <div style="display:flex; gap:8px">
+                        <a href="laudo.html?id=${laudo.id}" class="btn-ver">Ver laudo</a>
+                        <button class="btn-ver" onclick="baixarPdf(${laudo.id})" style="border:1px solid #2563eb; color:#2563eb">📄 PDF</button>
+                    </div>
+                `
+                lista.appendChild(card)
+            })
+        })
+        .catch(function() {
+            document.getElementById('lista-laudos').innerHTML =
+                '<p class="sem-laudos">Erro ao carregar os laudos.</p>'
+        })
+
+        function baixarPdf(id) {
+            fetch(`http://127.0.0.1:5000/baixar-pdf/${id}`, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(r => {
+                if (!r.ok) { alert('PDF não disponível para este laudo.'); return null }
+                return r.blob()
+            })
+            .then(function(blob) {
+                if (!blob) return
+                const url  = URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href     = url
+                link.download = 'laudo_vistoria.pdf'
+                link.click()
+            })
+        }
+    </script>
+
+</body>
+</html>

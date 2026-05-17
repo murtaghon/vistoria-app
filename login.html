@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VistorIA — Login</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <img src="logo completa 2.png" alt="VistorIA">
+    </header>
+
+    <main>
+        <div class="auth-box">
+
+            <!-- Abas -->
+            <div class="auth-abas">
+                <button class="aba ativa" id="aba-login" onclick="mostrarAba('login')">Entrar</button>
+                <button class="aba" id="aba-cadastro" onclick="mostrarAba('cadastro')">Cadastrar</button>
+            </div>
+
+            <!-- Login -->
+            <div id="form-login">
+                <h2>Bem-vindo de volta</h2>
+                <input class="auth-input" id="login-email" type="email" placeholder="Email">
+                <input class="auth-input" id="login-senha" type="password" placeholder="Senha">
+                <button class="btn-gerar" id="btn-login">Entrar</button>
+                <div class="mensagem-erro" id="erro-login"></div>
+            </div>
+
+            <!-- Cadastro -->
+            <div id="form-cadastro" style="display:none">
+                <h2>Criar conta</h2>
+                <input class="auth-input" id="cad-nome" type="text" placeholder="Seu nome">
+                <input class="auth-input" id="cad-email" type="email" placeholder="Email">
+                <input class="auth-input" id="cad-senha" type="password" placeholder="Senha (mín. 6 caracteres)">
+                <button class="btn-gerar" id="btn-cadastro">Criar conta</button>
+                <div class="mensagem-erro" id="erro-cadastro"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        function mostrarAba(aba) {
+            document.getElementById('form-login').style.display    = aba === 'login'    ? 'flex' : 'none'
+            document.getElementById('form-cadastro').style.display = aba === 'cadastro' ? 'flex' : 'none'
+            document.getElementById('aba-login').classList.toggle('ativa', aba === 'login')
+            document.getElementById('aba-cadastro').classList.toggle('ativa', aba === 'cadastro')
+        }
+
+        // Login
+        document.getElementById('btn-login').addEventListener('click', function() {
+            const email = document.getElementById('login-email').value
+            const senha = document.getElementById('login-senha').value
+            const erro  = document.getElementById('erro-login')
+            erro.textContent = ''
+
+            fetch('http://127.0.0.1:5000/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, senha })
+            })
+            .then(r => r.json())
+            .then(function(dados) {
+                if (dados.token) {
+                    localStorage.setItem('token', dados.token)
+                    localStorage.setItem('nome', dados.nome)
+                    window.location.href = 'index.html'
+                } else {
+                    erro.textContent = '⚠️ ' + dados.erro
+                }
+            })
+            .catch(function() {
+                erro.textContent = '⚠️ Erro ao conectar com o servidor.'
+            })
+        })
+
+        // Cadastro
+        document.getElementById('btn-cadastro').addEventListener('click', function() {
+            const nome  = document.getElementById('cad-nome').value
+            const email = document.getElementById('cad-email').value
+            const senha = document.getElementById('cad-senha').value
+            const erro  = document.getElementById('erro-cadastro')
+            erro.textContent = ''
+
+            fetch('http://127.0.0.1:5000/cadastro', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome, email, senha })
+            })
+            .then(r => r.json())
+            .then(function(dados) {
+                if (dados.mensagem) {
+                    mostrarAba('login')
+                    document.getElementById('erro-login').style.color = '#22c55e'
+                    document.getElementById('erro-login').textContent = '✅ Conta criada! Faça login.'
+                } else {
+                    erro.textContent = '⚠️ ' + dados.erro
+                }
+            })
+            .catch(function() {
+                erro.textContent = '⚠️ Erro ao conectar com o servidor.'
+            })
+        })
+    </script>
+
+</body>
+</html>

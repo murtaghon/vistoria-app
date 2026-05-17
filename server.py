@@ -11,11 +11,22 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from dotenv import load_dotenv
 from PIL import Image as PILImage
 import os, io, json, tempfile
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+import bcrypt
+from banco import inicializar, conectar
+from datetime import timedelta
 
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+
+app.config['JWT_SECRET_KEY'] = 'vistoria-secret-2026'
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
+jwt = JWTManager(app)
+
+# Inicializa o banco ao subir o servidor
+inicializar()
 
 client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
 
@@ -24,11 +35,17 @@ Você é um assistente de vistoria de imóveis.
 
 Analise cada foto enviada e identifique qual cômodo ou área do imóvel ela representa.
 
+REGRA IMPORTANTE — Numeração de ambientes repetidos:
+- Se houver mais de uma foto do mesmo tipo de cômodo, numere cada um de forma diferente
+- Exemplos: "Banheiro 1", "Banheiro 2", "Quarto 1", "Quarto 2", "Sala de Estar", "Sala de Jantar"
+- Fotos consecutivas do mesmo ambiente (ângulos diferentes) devem ter o MESMO nome e número
+- Use o contexto visual para distinguir ambientes diferentes — cores, móveis, revestimentos diferentes indicam cômodos diferentes
+
 Responda APENAS com um JSON válido, sem texto adicional, sem markdown, sem explicações.
 O JSON deve ter exatamente este formato:
 {"comodos": ["Nome do Cômodo 1", "Nome do Cômodo 2", "Nome do Cômodo 3"]}
 
-Exemplos de nomes: "Sala de Estar", "Quarto Principal", "Banheiro Social", "Cozinha", "Área de Serviço", "Varanda", "Corredor"
+Exemplos de nomes: "Sala de Estar", "Quarto 1", "Quarto 2", "Banheiro 1", "Banheiro 2", "Cozinha", "Área de Serviço", "Varanda", "Corredor"
 
 Se não conseguir identificar, use "Área não identificada".
 A lista deve ter exatamente o mesmo número de itens que o número de fotos enviadas.
@@ -428,10 +445,162 @@ def gerar_pdf():
             pass
 
     buffer.seek(0)
+
+    # Salva o PDF no servidor se vier laudo_id
+    laudo_id = request.form.get('laudo_id', '')
+    if laudo_id:
+        pdf_dir  = os.path.join(os.path.dirname(__file__), 'pdfs')
+        os.makedirs(pdf_dir, exist_ok=True)
+        pdf_path = os.path.join(pdf_dir, f'laudo_{laudo_id}.pdf')
+        with open(pdf_path, 'wb') as f:
+            f.write(buffer.getvalue())
+        buffer.seek(0)
+
+        # Atualiza o caminho no banco
+        conn = conectar()
+        conn.execute('UPDATE laudos SET pdf_path = ? WHERE id = ?',
+                     (pdf_path, laudo_id))
+        conn.commit()
+        conn.close()
+
     return send_file(buffer, mimetype='application/pdf',
                      as_attachment=True,
                      download_name='laudo_vistoria.pdf')
 
+# ─── Cadastro ────────────────────────────────────────────
+@app.route('/cadastro', methods=['POST'])
+def cadastro():
+    dados = request.get_json()
+    nome  = dados.get('nome', '').strip()
+    email = dados.get('email', '').strip().lower()
+    senha = dados.get('senha', '')
+
+    if not nome or not email or not senha:
+        return jsonify({'erro': 'Preencha todos os campos'}), 400
+
+    if len(senha) < 6:
+        return jsonify({'erro': 'Senha deve ter ao menos 6 caracteres'}), 400
+
+    senha_hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
+
+    try:
+        conn = conectar()
+        conn.execute('INSERT INTO usuarios (nome, email, senha) VALUES (?, ?, ?)',
+                     (nome, email, senha_hash))
+        conn.commit()
+        conn.close()
+        return jsonify({'mensagem': 'Cadastro realizado com sucesso!'})
+    except:
+        return jsonify({'erro': 'Email já cadastrado'}), 400
+
+
+# ─── Login ───────────────────────────────────────────────
+@app.route('/login', methods=['POST'])
+def login():
+    dados = request.get_json()
+    email = dados.get('email', '').strip().lower()
+    senha = dados.get('senha', '')
+
+    conn = conectar()
+    usuario = conn.execute(
+        'SELECT id, nome, senha FROM usuarios WHERE email = ?', (email,)
+    ).fetchone()
+    conn.close()
+
+    if not usuario:
+        return jsonify({'erro': 'Email ou senha incorretos'}), 401
+
+    if not bcrypt.checkpw(senha.encode(), usuario[2].encode()):
+        return jsonify({'erro': 'Email ou senha incorretos'}), 401
+
+    token = create_access_token(identity=str(usuario[0]))
+    return jsonify({'token': token, 'nome': usuario[1]})
+
+
+# ─── Salvar laudo ────────────────────────────────────────
+@app.route('/salvar-laudo', methods=['POST'])
+@jwt_required()
+def salvar_laudo():
+    usuario_id = get_jwt_identity()
+    dados      = request.get_json()
+    laudo      = dados.get('laudo', '')
+    endereco   = dados.get('endereco', 'Endereço não informado')
+
+    if not laudo:
+        return jsonify({'erro': 'Laudo vazio'}), 400
+
+    conn = conectar()
+    cursor = conn.execute(
+        'INSERT INTO laudos (usuario_id, endereco, laudo_texto) VALUES (?, ?, ?)',
+        (usuario_id, endereco, laudo)
+    )
+    laudo_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    return jsonify({'mensagem': 'Laudo salvo com sucesso!', 'laudo_id': laudo_id})
+
+
+# ─── Histórico de laudos ─────────────────────────────────
+@app.route('/historico', methods=['GET'])
+@jwt_required()
+def historico():
+    usuario_id = get_jwt_identity()
+
+    conn   = conectar()
+    laudos = conn.execute(
+        'SELECT id, endereco, criado_em FROM laudos WHERE usuario_id = ? ORDER BY criado_em DESC',
+        (usuario_id,)
+    ).fetchall()
+    conn.close()
+
+    return jsonify({'laudos': [
+        {'id': l[0], 'endereco': l[1], 'criado_em': l[2]}
+        for l in laudos
+    ]})
+
+
+# ─── Buscar laudo específico ─────────────────────────────
+@app.route('/laudo/<int:laudo_id>', methods=['GET'])
+@jwt_required()
+def buscar_laudo(laudo_id):
+    usuario_id = get_jwt_identity()
+
+    conn  = conectar()
+    laudo = conn.execute(
+        'SELECT id, endereco, laudo_texto, criado_em FROM laudos WHERE id = ? AND usuario_id = ?',
+        (laudo_id, usuario_id)
+    ).fetchone()
+    conn.close()
+
+    if not laudo:
+        return jsonify({'erro': 'Laudo não encontrado'}), 404
+
+    return jsonify({
+        'id':        laudo[0],
+        'endereco':  laudo[1],
+        'laudo':     laudo[2],
+        'criado_em': laudo[3]
+    })
+
+@app.route('/baixar-pdf/<int:laudo_id>', methods=['GET'])
+@jwt_required()
+def baixar_pdf(laudo_id):
+    usuario_id = get_jwt_identity()
+
+    conn  = conectar()
+    laudo = conn.execute(
+        'SELECT pdf_path FROM laudos WHERE id = ? AND usuario_id = ?',
+        (laudo_id, usuario_id)
+    ).fetchone()
+    conn.close()
+
+    if not laudo or not laudo[0]:
+        return jsonify({'erro': 'PDF não encontrado'}), 404
+
+    return send_file(laudo[0], mimetype='application/pdf',
+                     as_attachment=True,
+                     download_name='laudo_vistoria.pdf')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
